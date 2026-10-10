@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="page-title">英文單字片語練習</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: { extend: {
+    fontFamily: { sans: ['system-ui','Inter','Noto Sans TC','sans-serif'] },
+    colors: {
+      indigo: { 50:'#f0f5ff',100:'#e5edff',200:'#cddbfa',300:'#b0c4f5',400:'#94aefa',500:'#8ca8ff',600:'#7595ff',700:'#5c7df2',800:'#4863cc',900:'#384f9e' },
+      emerald: { 50:'#f0fdf7',100:'#e0fbf0',200:'#bcf2d9',300:'#95e3c0',400:'#76d6a9',500:'#6ee7b7',600:'#4fcea0',700:'#34b285',800:'#268a66',900:'#1d6b51' },
+      amber: { 50:'#fffbf0',100:'#fef5d0',200:'#fceca1',300:'#fade70',400:'#facd4b',500:'#fcd34d',600:'#fbbf24',700:'#f59e0b',800:'#c27c06',900:'#915c02' },
+      rose: { 50:'#fff5f0',100:'#ffe8e0',200:'#ffd0bd',300:'#ffb396',400:'#ffa180',500:'#ff8a66',600:'#f56b42',700:'#e05228',800:'#ad3a18',900:'#80260d' }
+    }
+  } }
+};
+</script>
+<style>
+body { background: linear-gradient(135deg,#e0f2fe 0%,#f0fdf4 50%,#fef3c7 100%); background-attachment: fixed; color:#475569; min-height:100vh; }
+.btn-hover { transition: all .2s cubic-bezier(.4,0,.2,1); }
+.btn-active:active { transform: scale(.96); }
+.perspective-1000 { perspective:1000px; }
+.transform-style-3d { transform-style:preserve-3d; }
+.backface-hidden { backface-visibility:hidden; }
+.rotate-y-180 { transform:rotateY(180deg); }
+@keyframes fadeInUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.animate-fade-in-up { animation:fadeInUp .3s ease-out forwards; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+.animate-shake { animation:shake .3s ease-in-out; }
+@keyframes blink { 50%{opacity:0} }
+#spelling-cursor { display:inline-block;width:2px;height:2rem;background:#475569;animation:blink 1s step-end infinite;vertical-align:bottom;margin-left:2px; }
+#flashcard-inner { transition:transform .5s; }
+#toast { position:fixed;bottom:60px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;transition:all .3s;z-index:200; }
+#toast.show { opacity:1;transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body class="min-h-screen antialiased pb-20">
+
+<!-- 題庫資料：由 build-pages.js 注入 -->
+<script id="vocab-data" type="application/json">__VOCAB_JSON__</script>
+
+<div class="w-full max-w-3xl mx-auto pt-10 px-4">
+
+  <!-- 主畫面 -->
+  <div id="screen-decks">
+    <div class="text-center mb-8">
+      <h1 id="app-title" class="text-4xl md:text-5xl font-extrabold text-slate-800 tracking-tight mb-2">英文單字片語練習</h1>
+      <p id="app-subtitle" class="text-slate-500 text-lg">選一組題庫，開始四種模式練到熟</p>
+    </div>
+    <div class="mb-6 relative">
+      <input type="text" id="deck-search" placeholder="搜尋題庫…" class="w-full px-4 py-3 border border-slate-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+    </div>
+    <div id="deck-list" class="grid grid-cols-1 gap-4"></div>
+    <div class="mt-8 bg-white/80 rounded-xl border border-slate-200 p-4 text-sm text-slate-500 leading-relaxed">
+      <span class="font-bold text-slate-700">玩法：</span>點題庫 → 選模式（單字卡 / 拼字 / 字母重組 / 聽音選單字）→ 看上方 <span class="font-mono font-bold">WORD x OF y</span> 掌握進度 → 答對看例句 → 上一題/下一題切換。發音使用瀏覽器語音，建議用 Chrome 或 Edge。
+    </div>
+  </div>
+
+  <!-- 模式選擇 -->
+  <div id="screen-modes" class="hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-xl text-center">
+      <h2 id="selected-unit-title" class="text-3xl font-extrabold text-slate-800"></h2>
+      <p id="selected-unit-goal" class="text-slate-500 mt-2"></p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+        <button data-mode="flashcard" class="mode-btn p-6 bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-xl shadow-lg hover:scale-[1.02] btn-hover btn-active text-left">
+          <span class="block text-2xl mb-1">📇</span><span class="block font-bold text-lg">單字卡</span>
+          <span class="block text-indigo-100 text-xs mt-1">看中文猜英文，點擊翻卡＋例句</span>
+        </button>
+        <button data-mode="spelling" class="mode-btn p-6 bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-xl shadow-lg hover:scale-[1.02] btn-hover btn-active text-left">
+          <span class="block text-2xl mb-1">⌨️</span><span class="block font-bold text-lg">拼字練習</span>
+          <span class="block text-rose-100 text-xs mt-1">虛擬鍵盤拼出正確單字</span>
+        </button>
+        <button data-mode="jumble" class="mode-btn p-6 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl shadow-lg hover:scale-[1.02] btn-hover btn-active text-left">
+          <span class="block text-2xl mb-1">🧩</span><span class="block font-bold text-lg">字母重組</span>
+          <span class="block text-emerald-100 text-xs mt-1">把打散的字母排回原形</span>
+        </button>
+        <button data-mode="listen" class="mode-btn p-6 bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-xl shadow-lg hover:scale-[1.02] btn-hover btn-active text-left">
+          <span class="block text-2xl mb-1">🎧</span><span class="block font-bold text-lg">聽音選單字</span>
+          <span class="block text-amber-100 text-xs mt-1">聽發音選出正確英文</span>
+        </button>
+      </div>
+      <button id="back-to-decks" class="mt-8 text-slate-500 hover:text-slate-700 font-medium py-2 px-6 rounded-lg hover:bg-slate-100">← 返回題庫列表</button>
+    </div>
+  </div>
+
+  <!-- 練習畫面 -->
+  <div id="screen-practice" class="hidden">
+    <div class="flex items-center justify-between mb-4">
+      <div id="progress-indicator" class="text-sm font-semibold text-slate-400 tracking-wide"></div>
+      <div class="flex items-center gap-2 text-xs font-mono">
+        <span class="bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full border border-indigo-100">⏱ <span id="hud-time">0.0秒</span></span>
+        <span class="bg-rose-50 text-rose-500 px-2.5 py-1 rounded-full border border-rose-100">✘ <span id="hud-errors">0次</span></span>
+      </div>
+    </div>
+    <div class="relative bg-white border border-slate-200 rounded-3xl p-8 min-h-[480px] flex flex-col items-center justify-between shadow-xl overflow-hidden">
+      <div id="feedback-indicator" class="absolute top-6 right-6 text-4xl font-bold z-10"></div>
+      <div class="w-full flex-grow flex flex-col justify-center items-center">
+        <div id="standard-display" class="w-full text-center mb-6">
+          <div class="flex items-center justify-center gap-4 mb-2 flex-wrap">
+            <span id="chinese-word" class="text-4xl md:text-5xl font-bold text-slate-800"></span>
+            <button id="speak-btn" class="w-10 h-10 flex items-center justify-center rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100" title="朗讀">🔊</button>
+          </div>
+          <div id="pos-badge" class="text-xs font-bold text-slate-400 mb-4"></div>
+          <div id="english-word-container" class="hidden min-h-[3rem] flex-col items-center justify-center">
+            <h2 id="english-word" class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 pb-1"></h2>
+            <div id="example-box" class="mt-3 bg-indigo-50/60 border border-indigo-100 rounded-xl px-4 py-3 max-w-xl">
+              <div id="example-en" class="text-slate-700 font-medium text-sm"></div>
+              <div id="example-zh" class="text-slate-400 text-xs mt-1"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="interaction-area" class="w-full max-w-2xl">
+          <div id="flashcard-mode" class="hidden w-full h-80 perspective-1000 cursor-pointer select-none mb-6">
+            <div id="flashcard-inner" class="relative w-full h-full text-center transform-style-3d">
+              <div class="absolute w-full h-full backface-hidden bg-gradient-to-br from-indigo-50 to-white border-2 border-indigo-100 rounded-2xl flex flex-col items-center justify-center shadow-sm">
+                <div class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-3">QUESTION</div>
+                <div id="flashcard-front-text" class="text-4xl font-bold text-slate-800 px-4"></div>
+                <div id="flashcard-front-pos" class="text-xs text-slate-400 mt-2"></div>
+                <div class="absolute bottom-5 text-slate-400 text-xs animate-pulse">點擊翻卡</div>
+              </div>
+              <div class="absolute w-full h-full backface-hidden bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-2xl flex flex-col items-center justify-center rotate-y-180 shadow-md p-4">
+                <div class="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-3">ANSWER</div>
+                <div id="flashcard-back-text" class="text-4xl md:text-5xl font-black px-4 break-words"></div>
+                <div id="flashcard-back-example" class="text-indigo-100 text-sm mt-3 max-w-md"></div>
+                <button id="flashcard-speak-btn" class="mt-4 w-12 h-12 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-xl">🔊</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="spelling-mode" class="hidden">
+            <div class="w-full bg-slate-50 min-h-[80px] p-4 flex justify-center items-center flex-wrap gap-1 text-4xl font-mono font-bold text-slate-700 rounded-2xl border-2 border-dashed border-slate-300 mb-4">
+              <span id="spelling-input-text"></span><span id="spelling-cursor"></span>
+            </div>
+            <div class="text-center mb-4"><button id="spelling-caps-btn" class="text-xs font-semibold text-slate-400 border border-slate-200 px-3 py-1 rounded-full hover:bg-slate-50">Aa 大小寫切換</button></div>
+            <div id="alphabet-keyboard" class="w-full flex justify-center items-center flex-wrap gap-2"></div>
+          </div>
+
+          <div id="jumble-mode" class="hidden">
+            <div id="jumble-answer" class="w-full bg-slate-50 min-h-[80px] p-4 flex justify-center items-center flex-wrap gap-2 border-2 border-dashed border-slate-300 rounded-2xl mb-6"></div>
+            <div id="jumble-pool" class="w-full flex justify-center items-center flex-wrap gap-3"></div>
+            <div class="text-center mt-6"><button id="jumble-caps-btn" class="text-xs font-semibold text-slate-400 border border-slate-200 px-3 py-1 rounded-full hover:bg-slate-50">Aa 大小寫切換</button></div>
+          </div>
+
+          <div id="listen-mode" class="hidden">
+            <div class="flex flex-col items-center justify-center mb-6">
+              <button id="listen-speak-btn" class="w-24 h-24 bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-full flex items-center justify-center text-4xl shadow-lg active:scale-95">🔊</button>
+              <p class="text-slate-400 text-sm mt-4">請聽發音選出正確單字（自動播3次）</p>
+            </div>
+            <div id="listen-options" class="flex flex-col gap-3 w-full max-w-sm mx-auto"></div>
+            <div id="listen-result" class="hidden mt-6 text-center animate-fade-in-up">
+              <div id="listen-result-en" class="text-3xl font-black text-indigo-600"></div>
+              <div id="listen-result-zh" class="text-xl font-bold text-slate-600"></div>
+              <div id="listen-result-ex" class="text-sm text-slate-400 mt-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="w-full mt-6">
+        <button id="check-answer-btn" class="w-full bg-indigo-600 text-white font-bold text-xl py-4 rounded-xl shadow-lg hover:bg-indigo-700 btn-active">檢查答案</button>
+      </div>
+    </div>
+    <div class="mt-6 grid grid-cols-2 gap-3 max-w-2xl mx-auto">
+      <button id="prev-button" class="bg-white text-slate-600 font-semibold py-3 rounded-xl border border-slate-200 hover:bg-slate-50">← 上一個</button>
+      <button id="next-button" class="bg-white text-slate-600 font-semibold py-3 rounded-xl border border-slate-200 hover:bg-slate-50">下一個 →</button>
+    </div>
+    <div class="grid grid-cols-2 gap-3 max-w-2xl mx-auto mt-2">
+      <button id="back-to-modes" class="text-slate-400 hover:text-slate-600 text-sm py-3 hover:underline">回選單</button>
+      <button id="finish-btn" class="text-rose-400 hover:text-rose-600 text-sm py-3 hover:underline">結束練習</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="bg-slate-800 text-white text-sm px-5 py-3 rounded-xl shadow-xl"></div>
+
+<footer class="fixed bottom-0 w-full bg-white/80 backdrop-blur border-t border-slate-200 py-2 px-4 z-40 flex justify-between items-center text-[11px] text-slate-400">
+  <!-- Made by 阿剛老師 -->
+  <div>英文單字片語練習</div>
+  <div class="text-right">
+    <span>Made by <a href="https://kentxchang.blogspot.tw" target="_blank" rel="noopener" class="hover:text-indigo-500 underline">阿剛老師</a></span> ·
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_Hant" target="_blank" rel="noopener" class="hover:text-indigo-500 underline">CC BY-NC-SA 4.0</a>
+    <span class="hidden sm:inline">｜本教材僅供非商業教學使用，改作請標示出處並以相同方式分享</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var VOCAB = null;
+  try { VOCAB = JSON.parse(document.getElementById('vocab-data').textContent); }
+  catch(e){ VOCAB = null; }
+
+  var state = { unit:null, words:[], idx:0, mode:'', isCaps:false, errors:0, startTs:0, timer:null, counts:{} };
+  try { state.counts = JSON.parse(localStorage.getItem('vocab_practice_counts')||'{}'); } catch(e){ state.counts = {}; }
+
+  var $ = function(id){ return document.getElementById(id); };
+  var synth = window.speechSynthesis;
+  var audioCtx = null;
+  try { audioCtx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){}
+
+  function toast(msg){
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+  function speak(en){
+    try{
+      if(!synth) return;
+      synth.cancel();
+      var u = new SpeechSynthesisUtterance(en); u.lang='en-US'; u.rate=0.9;
+      synth.speak(u);
+    }catch(e){}
+  }
+  function playSound(type){
+    try{
+      if(!audioCtx) return;
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
+      if(type==='correct'){ o.type='sine'; o.frequency.setValueAtTime(523,audioCtx.currentTime); o.frequency.linearRampToValueAtTime(784,audioCtx.currentTime+0.12); o.start(); o.stop(audioCtx.currentTime+0.22); }
+      else { o.type='square'; o.frequency.setValueAtTime(160,audioCtx.currentTime); o.start(); o.stop(audioCtx.currentTime+0.2); }
+    }catch(e){}
+  }
+
+  function show(id){
+    ['screen-decks','screen-modes','screen-practice'].forEach(function(s){ $(s).classList.add('hidden'); });
+    $(id).classList.remove('hidden');
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  // ---- 主畫面 ----
+  function renderDecks(kw){
+    var list = $('deck-list'); list.innerHTML='';
+    if(!VOCAB || !VOCAB.units || !VOCAB.units.length){
+      list.innerHTML = '<div class="p-8 text-center bg-white rounded-xl border border-dashed">題庫載入失敗</div>'; return;
+    }
+    if(VOCAB.meta && VOCAB.meta.title){ $('app-title').textContent = VOCAB.meta.title; $('page-title').textContent = VOCAB.meta.title; }
+    if(VOCAB.meta && VOCAB.meta.subtitle){ $('app-subtitle').textContent = VOCAB.meta.subtitle; }
+    var k = (kw||'').toLowerCase();
+    VOCAB.units.filter(function(u){ return !k || (u.name||'').toLowerCase().indexOf(k)>=0; }).forEach(function(u){
+      var c = state.counts[u.id]||0;
+      var div = document.createElement('div');
+      div.className = 'bg-white p-5 rounded-xl border border-slate-100 shadow-sm hover:shadow-md flex flex-col md:flex-row justify-between items-center gap-4';
+      div.innerHTML =
+        '<div class="flex items-center gap-4 w-full md:w-auto overflow-hidden">' +
+          '<div class="w-14 h-14 rounded-lg bg-indigo-50 flex items-center justify-center text-2xl">📝</div>' +
+          '<div><div class="font-bold text-lg text-slate-800"></div>' +
+          '<div class="text-xs text-slate-500 mt-0.5 goal"></div>' +
+          '<div class="text-xs mt-1"><span class="bg-slate-100 px-2 py-0.5 rounded-full">'+u.words.length+' 字</span> ' +
+          (c>0?'<span class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">已練 '+c+' 次</span>':'') + '</div></div></div>' +
+        '<button class="bg-indigo-600 text-white font-medium py-2 px-6 rounded-lg hover:bg-indigo-700 text-sm btn-active">練習</button>';
+      div.querySelector('.font-bold').textContent = u.name;
+      div.querySelector('.goal').textContent = u.goal || '';
+      div.querySelector('button').addEventListener('click', function(){ openModes(u.id); });
+      list.appendChild(div);
+    });
+    if(!list.children.length) list.innerHTML = '<div class="p-8 text-center bg-white rounded-xl border border-dashed text-slate-400">找不到符合的題庫</div>';
+  }
+
+  function openModes(uid){
+    state.unit = VOCAB.units.filter(function(u){return u.id===uid;})[0];
+    if(!state.unit) return;
+    $('selected-unit-title').textContent = state.unit.name;
+    $('selected-unit-goal').textContent = (state.unit.goal||'') + '（共 '+state.unit.words.length+' 字）';
+    show('screen-modes');
+  }
+
+  // ---- 模式 ----
+  document.querySelectorAll('.mode-btn').forEach(function(b){
+    b.addEventListener('click', function(){
+      state.mode = b.dataset.mode; state.idx = 0; state.isCaps = false;
+      state.words = state.unit.words.slice().sort(function(){return Math.random()-0.5;});
+      setupModeUI(); show('screen-practice'); displayWord();
+      state.counts[state.unit.id]=(state.counts[state.unit.id]||0)+1;
+      try{ localStorage.setItem('vocab_practice_counts', JSON.stringify(state.counts)); }catch(e){}
+    });
+  });
+
+  function setupModeUI(){
+    ['spelling-mode','jumble-mode','flashcard-mode','listen-mode'].forEach(function(id){ $(id).classList.add('hidden'); });
+    $('standard-display').classList.remove('hidden');
+    $('check-answer-btn').classList.remove('hidden');
+    if(state.mode==='flashcard'){ $('standard-display').classList.add('hidden'); $('flashcard-mode').classList.remove('hidden'); $('check-answer-btn').classList.add('hidden'); }
+    if(state.mode==='spelling'){ $('spelling-mode').classList.remove('hidden'); }
+    if(state.mode==='jumble'){ $('jumble-mode').classList.remove('hidden'); }
+    if(state.mode==='listen'){ $('standard-display').classList.add('hidden'); $('listen-mode').classList.remove('hidden'); $('check-answer-btn').classList.add('hidden'); }
+  }
+
+  function norm(s){ return (s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+  var listenTimer = null;
+  function displayWord(){
+    if(state.timer) clearInterval(state.timer);
+    var w = state.words[state.idx];
+    state.errors = 0; state.startTs = Date.now();
+    $('hud-time').textContent='0.0秒'; $('hud-errors').textContent='0次';
+    state.timer = setInterval(function(){
+      $('hud-time').textContent = ((Date.now()-state.startTs)/1000).toFixed(1)+'秒';
+      $('hud-errors').textContent = state.errors+'次';
+    },100);
+    $('progress-indicator').textContent = 'WORD '+(state.idx+1)+' OF '+state.words.length;
+    $('feedback-indicator').textContent='';
+    $('chinese-word').textContent = w.zh;
+    $('pos-badge').textContent = w.pos || '';
+    $('english-word').textContent = w.en;
+    $('example-en').textContent = 'e.g. ' + (w.example_en||'');
+    $('example-zh').textContent = w.example_zh || '';
+    $('english-word-container').classList.add('hidden');
+    $('english-word-container').classList.remove('flex');
+    $('check-answer-btn').disabled = false;
+
+    if(state.mode==='flashcard'){
+      $('flashcard-front-text').textContent = w.zh;
+      $('flashcard-front-pos').textContent = w.pos||'';
+      $('flashcard-back-text').textContent = w.en;
+      $('flashcard-back-example').textContent = (w.example_en||'')+' ｜ '+(w.example_zh||'');
+      $('flashcard-inner').classList.remove('rotate-y-180');
+    }
+    if(state.mode==='spelling'){ renderKeyboard(); $('spelling-input-text').textContent=''; }
+    if(state.mode==='jumble'){ renderJumble(w.en); }
+    if(state.mode==='listen'){ renderListen(); }
+    $('prev-button').disabled = (state.idx===0);
+    $('next-button').disabled = (state.idx===state.words.length-1);
+  }
+
+  function renderKeyboard(){
+    var kb = $('alphabet-keyboard'); kb.innerHTML='';
+    'abcdefghijklmnopqrstuvwxyz'.split('').forEach(function(ch){
+      var b = document.createElement('button');
+      b.className='w-10 h-10 md:w-11 md:h-11 bg-white text-indigo-600 font-bold rounded-lg border border-indigo-100 hover:bg-indigo-50 shadow-sm active:scale-95 text-lg';
+      b.textContent = state.isCaps ? ch.toUpperCase() : ch;
+      b.addEventListener('click', function(){ $('spelling-input-text').textContent += b.textContent; });
+      kb.appendChild(b);
+    });
+    var bk = document.createElement('button');
+    bk.className='px-4 h-10 bg-slate-100 text-slate-600 font-bold rounded-lg border border-slate-200';
+    bk.textContent='⌫';
+    bk.addEventListener('click', function(){ var t=$('spelling-input-text').textContent; $('spelling-input-text').textContent=t.slice(0,-1); });
+    kb.appendChild(bk);
+  }
+
+  function renderJumble(en){
+    var pool=$('jumble-pool'), ans=$('jumble-answer');
+    pool.innerHTML=''; ans.innerHTML='';
+    en.replace(/\s/g,'').split('').sort(function(){return Math.random()-0.5;}).forEach(function(ch){
+      var b=document.createElement('button');
+      b.className='w-11 h-11 bg-emerald-50 text-emerald-600 font-bold rounded-lg border border-emerald-100 shadow-sm text-xl active:scale-95';
+      b.textContent = state.isCaps ? ch.toUpperCase() : ch.toLowerCase();
+      b.addEventListener('click', function(){ (b.parentElement===pool?ans:pool).appendChild(b); });
+      pool.appendChild(b);
+    });
+  }
+
+  function renderListen(){
+    var w = state.words[state.idx], box = $('listen-options');
+    box.innerHTML=''; $('listen-result').classList.add('hidden');
+    var opts=[w], pool=state.words.filter(function(x){return x.en!==w.en;}).sort(function(){return Math.random()-0.5;});
+    if(pool[0]) opts.push(pool[0]); if(pool[1]) opts.push(pool[1]);
+    while(opts.length<3) opts.push({en:'apple',zh:'蘋果',pos:'n.',example_en:'An apple a day.',example_zh:'一天一蘋果。'});
+    opts.sort(function(){return Math.random()-0.5;});
+    opts.forEach(function(o){
+      var b=document.createElement('button');
+      b.className='w-full py-4 px-6 bg-white border-2 border-slate-200 text-slate-700 font-bold text-xl rounded-xl hover:border-indigo-400 hover:bg-indigo-50';
+      b.textContent=o.en;
+      b.addEventListener('click', function(){
+        if(o.en===w.en){
+          b.classList.add('border-emerald-500','bg-emerald-50','text-emerald-600');
+          playSound('correct'); $('feedback-indicator').textContent='✅';
+          $('listen-result-en').textContent=w.en; $('listen-result-zh').textContent=w.zh;
+          $('listen-result-ex').textContent=(w.example_en||'')+' ｜ '+(w.example_zh||'');
+          $('listen-result').classList.remove('hidden');
+          Array.prototype.forEach.call(box.children,function(x){x.disabled=true;});
+          if(listenTimer) clearInterval(listenTimer);
+        } else {
+          state.errors++; playSound('wrong'); $('feedback-indicator').textContent='❌';
+          b.classList.add('bg-rose-100','border-rose-400');
+          setTimeout(function(){b.classList.remove('bg-rose-100','border-rose-400');},700);
+        }
+      });
+      box.appendChild(b);
+    });
+    if(listenTimer) clearInterval(listenTimer);
+    var n=0;
+    var play=function(){ speak(w.en); n++; };
+    setTimeout(play,300);
+    listenTimer=setInterval(function(){ if(n>=3||state.mode!=='listen'){clearInterval(listenTimer);return;} play(); },1800);
+  }
+
+  function showAnswer(){
+    $('english-word-container').classList.remove('hidden');
+    $('english-word-container').classList.add('flex');
+    $('check-answer-btn').disabled=true;
+    setTimeout(function(){
+      if(state.idx < state.words.length-1){ state.idx++; displayWord(); }
+      else toast('本組練習完成！可用 上一個 複習或回選單換模式');
+    },1600);
+  }
+
+  $('check-answer-btn').addEventListener('click', function(){
+    var w=state.words[state.idx], target=norm(w.en), input='';
+    if(state.mode==='spelling') input=norm($('spelling-input-text').textContent);
+    else if(state.mode==='jumble'){ Array.prototype.forEach.call($('jumble-answer').children,function(b){input+=b.textContent;}); input=norm(input); }
+    else return;
+    if(input===target){ playSound('correct'); $('feedback-indicator').textContent='✅'; showAnswer(); }
+    else { state.errors++; playSound('wrong'); $('feedback-indicator').textContent='❌';
+      $('english-word-container').classList.add('animate-shake');
+      setTimeout(function(){$('english-word-container').classList.remove('animate-shake');},500); }
+  });
+
+  $('speak-btn').addEventListener('click', function(){ speak(state.words[state.idx].en); });
+  $('flashcard-speak-btn').addEventListener('click', function(e){ e.stopPropagation(); speak(state.words[state.idx].en); });
+  $('flashcard-mode').addEventListener('click', function(){ $('flashcard-inner').classList.toggle('rotate-y-180'); });
+  $('listen-speak-btn').addEventListener('click', function(){ speak(state.words[state.idx].en); });
+  $('spelling-caps-btn').addEventListener('click', renderKeyboardToggle);
+  $('jumble-caps-btn').addEventListener('click', function(){ state.isCaps=!state.isCaps; renderJumble(state.words[state.idx].en); });
+  function renderKeyboardToggle(){ state.isCaps=!state.isCaps; renderKeyboard(); }
+  $('prev-button').addEventListener('click', function(){ if(state.idx>0){state.idx--; displayWord();} });
+  $('next-button').addEventListener('click', function(){ if(state.idx<state.words.length-1){state.idx++; displayWord();} });
+  $('back-to-decks').addEventListener('click', function(){ show('screen-decks'); renderDecks($('deck-search').value); });
+  $('back-to-modes').addEventListener('click', function(){ if(state.timer)clearInterval(state.timer); if(listenTimer)clearInterval(listenTimer); show('screen-modes'); });
+  $('finish-btn').addEventListener('click', function(){ if(state.timer)clearInterval(state.timer); if(listenTimer)clearInterval(listenTimer); show('screen-decks'); renderDecks($('deck-search').value); });
+  $('deck-search').addEventListener('input', function(e){ renderDecks(e.target.value.trim()); });
+
+  renderDecks('');
+})();
+</script>
+</body>
+</html>
